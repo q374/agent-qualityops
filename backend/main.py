@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from .adapters import ModelAdapter, ModelError
+from .config import load_local_env
 from .database import Database
 from .evaluator import Judge
 from .schemas import CasesImport, HumanReviewInput, PromptVersionInput, RunCreate
@@ -15,6 +16,7 @@ from .service import BadRequestError, ConflictError, NotFoundError, QualityOpsSe
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+load_local_env(PROJECT_ROOT / ".env")
 
 
 def create_app(
@@ -58,8 +60,13 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @application.get("/api/health")
-    def health() -> dict[str, str]:
-        return {"status": "ok", "database": "ready"}
+    def health() -> dict[str, Any]:
+        return {
+            "status": "ok",
+            "database": "ready",
+            "deepseek_configured": bool(os.getenv("DEEPSEEK_API_KEY", "").strip()),
+            "deepseek_model": os.getenv("DEEPSEEK_MODEL", "deepseek-flash"),
+        }
 
     @application.get("/api/summary")
     def summary() -> dict[str, Any]:

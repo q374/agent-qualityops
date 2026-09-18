@@ -405,8 +405,8 @@ class QualityOpsService:
     @staticmethod
     def pricing() -> tuple[float, float]:
         return (
-            float(os.getenv("DEEPSEEK_INPUT_CNY_PER_MILLION", "2")),
-            float(os.getenv("DEEPSEEK_OUTPUT_CNY_PER_MILLION", "8")),
+            float(os.getenv("DEEPSEEK_INPUT_CNY_PER_MILLION", "2.2")),
+            float(os.getenv("DEEPSEEK_OUTPUT_CNY_PER_MILLION", "8.7")),
         )
 
     def calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
@@ -425,7 +425,7 @@ class QualityOpsService:
             "currency": "CNY",
             "input_cny_per_million_tokens": input_rate if mode == "deepseek" else 0,
             "output_cny_per_million_tokens": output_rate if mode == "deepseek" else 0,
-            "note": "DeepSeek 高峰价保守估算；实际费用按响应 usage 计算。演示模式不调用模型，成本为 0。",
+            "note": "DeepSeek Flash 峰值美元价格按 7.2 汇率折算的保守估算；实际账单以官方计费为准。演示模式不调用模型，成本为 0。",
         }
 
     def _results_for_run(self, run_id: int) -> list[dict[str, Any]]:

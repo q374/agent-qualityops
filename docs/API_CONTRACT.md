@@ -13,7 +13,7 @@ Base path: `/api`
 
 ## Endpoints
 
-- `GET /health`
+- `GET /health`，返回数据库状态、`deepseek_configured` 布尔值和模型名称，但不返回密钥
 - `GET /summary`
 - `GET /cases`
 - `POST /cases/import` with `{ "cases": EvalCaseInput[] }`

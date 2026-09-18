@@ -52,7 +52,9 @@ npm run dev
 
 ### 3. 真实模型模式（可选）
 
-将 `.env.example` 复制为 `.env`，只在本地填写 `DEEPSEEK_API_KEY`。默认模型为 `deepseek-flash`，预算上限为 5 元。不要将 `.env` 提交到 Git。
+项目根目录已经准备了被 Git 忽略的 `.env`。只在该本地文件中填写 `DEEPSEEK_API_KEY`，然后重启后端；项目会自动加载，不覆盖系统已有环境变量。不要把密钥粘贴到聊天、日志或 Git。
+
+默认模型为 `deepseek-flash`，单批预算硬上限为 5 元。界面左下角会显示“DeepSeek 已配置”或“Demo 模式 · 未配置 API”。当前费用只是根据官方峰值美元价格和示例汇率进行的保守预算估算，真实账单以 DeepSeek 官方计费为准。
 
 ## 验证
 
