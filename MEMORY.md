@@ -20,7 +20,7 @@
 - 已初始化独立 Git 仓库。
 - API 契约见 `docs/API_CONTRACT.md`。
 - FastAPI + SQLite 后端、React/TypeScript 前端、50 条评测数据与产品材料已完成。
-- 已通过 10 项后端测试、前端 TypeScript 检查与生产构建。
+- 已通过 12 项后端测试、前端 TypeScript 检查与生产构建。
 - 已在浏览器实际走通：双版本 Demo 运行、版本比较、Badcase 人工复核、门禁阻断与报告生成。
 - `docs/DEMO_EVIDENCE.json` 为可复现的离线证据；结果不代表真实模型效果。
 - 当前环境未配置 `DEEPSEEK_API_KEY`，真实模型调用与真实成本未验证。
