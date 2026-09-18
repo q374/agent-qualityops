@@ -9,6 +9,7 @@ Base path: `/api`
 - `EvalRun`: `id`, `prompt_version_id`, `status`, `mode`, `started_at`, `completed_at`, `spent_cny`, `error_message`.
 - `EvalResult`: `id`, `run_id`, `case_id`, `output_text`, `correctness_score`, `groundedness_score`, `task_completion_score`, `safety_pass`, `latency_ms`, `input_tokens`, `output_tokens`, `cost_cny`, `failure_category`, `severity`, `needs_review`, `review_status`.
 - `HumanReview`: `id`, `result_id`, `decision`, `correctness_score`, `groundedness_score`, `task_completion_score`, `failure_category`, `severity`, `notes`, `reviewed_at`.
+- `AuditEvent`: `id`, `action`, `entity_type`, `entity_id`, `summary`, `metadata`, `created_at`。`metadata` 只保存计数、状态、决策等最小必要信息，不保存 Prompt 正文、复核备注或密钥。
 
 ## Endpoints
 
@@ -26,6 +27,7 @@ Base path: `/api`
 - `POST /results/{result_id}/review`
 - `GET /release-gates/{candidate_run_id}?baseline_run_id=...`
 - `GET /reports/{run_id}`
+- `GET /audit-events?action=...&entity_type=...&limit=100`，`limit` 范围为 1—200
 
 ## Release gate defaults
 

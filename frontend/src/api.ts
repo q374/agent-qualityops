@@ -1,4 +1,4 @@
-import type { ApiErrorShape, EvalCase, EvalRun, HumanReview, PromptVersion } from './types'
+import type { ApiErrorShape, AuditEvent, EvalCase, EvalRun, HumanReview, PromptVersion } from './types'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || '/api'
 
@@ -60,4 +60,9 @@ export const api = {
   review: (resultId: number, payload: HumanReview) => request<unknown>(`/results/${resultId}/review`, { method: 'POST', body: JSON.stringify(payload) }),
   gate: (candidate: number, baseline: number) => request<Record<string, unknown>>(`/release-gates/${candidate}?baseline_run_id=${baseline}`),
   report: (runId: number) => request<Record<string, unknown>>(`/reports/${runId}`),
+  auditEvents: (action = '') => {
+    const query = new URLSearchParams({ limit: '100' })
+    if (action) query.set('action', action)
+    return request<unknown>(`/audit-events?${query}`).then(asList<AuditEvent>)
+  },
 }

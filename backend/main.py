@@ -35,7 +35,7 @@ def create_app(
 
     application = FastAPI(
         title="Agent QualityOps API",
-        version="0.1.0",
+        version="0.2.0",
         description="企业智能体评测与质量运营平台 MVP。演示数据为公开资料与合成用例。",
     )
     application.state.service = service
@@ -112,6 +112,14 @@ def create_app(
     @application.get("/api/reports/{run_id}")
     def report(run_id: int) -> dict[str, Any]:
         return call(service.report, run_id)
+
+    @application.get("/api/audit-events")
+    def audit_events(
+        action: str | None = Query(default=None, max_length=100),
+        entity_type: str | None = Query(default=None, max_length=100),
+        limit: int = Query(default=100, ge=1, le=200),
+    ) -> list[dict[str, Any]]:
+        return service.list_audit_events(action=action, entity_type=entity_type, limit=limit)
 
     return application
 

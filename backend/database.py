@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class Database:
@@ -109,8 +109,18 @@ class Database:
                     notes TEXT NOT NULL DEFAULT '',
                     reviewed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
+                CREATE TABLE IF NOT EXISTS audit_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    action TEXT NOT NULL,
+                    entity_type TEXT NOT NULL,
+                    entity_id INTEGER,
+                    summary TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
                 CREATE INDEX IF NOT EXISTS idx_results_run ON eval_results(run_id);
                 CREATE INDEX IF NOT EXISTS idx_reviews_result ON human_reviews(result_id, id DESC);
+                CREATE INDEX IF NOT EXISTS idx_audit_action_created ON audit_events(action, id DESC);
                 """
             )
             conn.execute(
@@ -139,4 +149,10 @@ def normalize_row(row: dict[str, Any]) -> dict[str, Any]:
     for key in ("is_baseline", "safety_pass", "needs_review"):
         if key in item:
             item[key] = bool(item[key])
+    return item
+
+
+def decode_audit_event(row: dict[str, Any]) -> dict[str, Any]:
+    item = dict(row)
+    item["metadata"] = json.loads(item.pop("metadata_json") or "{}")
     return item

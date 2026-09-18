@@ -107,3 +107,13 @@ export interface ReleaseGateData {
 }
 
 export interface ApiErrorShape { detail?: string | { msg?: string }[]; message?: string }
+
+export interface AuditEvent {
+  id: number
+  action: string
+  entity_type: string
+  entity_id?: number | null
+  summary: string
+  metadata: Record<string, unknown>
+  created_at: string
+}

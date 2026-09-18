@@ -1,8 +1,8 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ApiError } from './api'
-import type { CompareData, EvalCase, EvalResult, EvalRun, HumanReview, PromptVersion, ReleaseGateData, Summary } from './types'
+import type { AuditEvent, CompareData, EvalCase, EvalResult, EvalRun, HumanReview, PromptVersion, ReleaseGateData, Summary } from './types'
 
-type PageId = 'overview' | 'cases' | 'runs' | 'badcases' | 'release'
+type PageId = 'overview' | 'cases' | 'runs' | 'badcases' | 'release' | 'audit'
 type IconName = PageId | 'refresh' | 'arrow' | 'check' | 'alert' | 'download' | 'plus' | 'close' | 'shield' | 'clock' | 'search'
 
 const nav: Array<{ id: PageId; label: string; hint: string }> = [
@@ -11,6 +11,7 @@ const nav: Array<{ id: PageId; label: string; hint: string }> = [
   { id: 'runs', label: '版本与运行', hint: '对照实验' },
   { id: 'badcases', label: 'Badcase 审核', hint: '问题归因' },
   { id: 'release', label: '发布门禁', hint: '决策与报告' },
+  { id: 'audit', label: '审计时间线', hint: '操作与证据' },
 ]
 
 const iconPaths: Record<IconName, ReactNode> = {
@@ -19,6 +20,7 @@ const iconPaths: Record<IconName, ReactNode> = {
   runs: <><path d="M5 5h5v5H5zM14 14h5v5h-5zM14 5h5v5h-5zM5 14h5v5H5z" /><path d="M10 7.5h4M16.5 10v4M14 16.5h-4M7.5 14v-4" /></>,
   badcases: <><path d="M12 3 3.7 18h16.6z" /><path d="M12 9v4M12 16h.01" /></>,
   release: <><path d="M12 3 5 6v5c0 4.8 3 8 7 10 4-2 7-5.2 7-10V6z" /><path d="m9 12 2 2 4-4" /></>,
+  audit: <><path d="M6 3h12v18H6z" /><path d="M9 8h6M9 12h6M9 16h4" /><path d="M9 3v2h6V3" /></>,
   refresh: <><path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 5v6h-6" /></>,
   arrow: <><path d="M5 12h14M15 8l4 4-4 4" /></>,
   check: <path d="m5 12 4 4L19 6" />,
@@ -257,6 +259,45 @@ function ReleasePage() {
   </div>
 }
 
+
+const auditActions = [
+  ['', '全部事件'],
+  ['cases.imported', '评测集导入'],
+  ['version.created', '版本创建'],
+  ['run.completed', '运行完成'],
+  ['review.submitted', '人工复核'],
+  ['gate.evaluated', '门禁判断'],
+] as const
+
+const auditLabels: Record<string, { label: string; tone: 'neutral' | 'good' | 'warn' | 'bad' | 'blue' }> = {
+  'cases.imported': { label: '数据导入', tone: 'blue' },
+  'version.created': { label: '版本创建', tone: 'neutral' },
+  'run.completed': { label: '运行完成', tone: 'good' },
+  'review.submitted': { label: '人工复核', tone: 'warn' },
+  'gate.evaluated': { label: '门禁判断', tone: 'bad' },
+}
+
+function auditMeta(event: AuditEvent) {
+  const entries = Object.entries(event.metadata || {})
+  if (!entries.length) return '无附加元数据'
+  return entries.map(([key, value]) => `${humanize(key)}：${Array.isArray(value) ? value.join('、') : String(value ?? '—')}`).join(' · ')
+}
+
+function AuditPage() {
+  const [action, setAction] = useState('')
+  const events = useLoad<AuditEvent[]>(() => api.auditEvents(action), [action])
+  return <div className="page-grid">
+    <div className="page-heading"><div><Badge tone="blue">AUDIT TRAIL</Badge><h1>审计时间线</h1><p>按时间倒序查看评测数据、版本运行、人工复核与发布决策。摘要不保存 Prompt 正文、复核备注或密钥。</p></div></div>
+    <Panel title="操作与决策记录" subtitle="默认展示最近 100 条事件" action={<button className="btn btn-secondary" onClick={() => void events.refresh()}><Icon name="refresh" />刷新</button>}>
+      <div className="audit-toolbar"><label><span>事件类型</span><select value={action} onChange={(event) => setAction(event.target.value)}>{auditActions.map(([value, label]) => <option key={value || 'all'} value={value}>{label}</option>)}</select></label><p>共 {events.data?.length ?? 0} 条 · 仅保留最小必要元数据</p></div>
+      {events.loading ? <LoadingRows /> : events.error ? <ErrorState message={events.error} retry={() => void events.refresh()} /> : events.data?.length ? <div className="audit-timeline">{events.data.map((event) => {
+        const meta = auditLabels[event.action] || { label: event.action, tone: 'neutral' as const }
+        return <article className="audit-event" key={event.id}><div className="audit-marker"><span /></div><div className="audit-card"><header><div><Badge tone={meta.tone}>{meta.label}</Badge><strong>{event.summary}</strong></div><time>{fmtDate(event.created_at)}</time></header><p>{auditMeta(event)}</p><footer><span>{event.entity_type}</span><b>{event.entity_id ? `#${event.entity_id}` : '批次事件'}</b><code>EVT-{String(event.id).padStart(4, '0')}</code></footer></div></article>
+      })}</div> : <EmptyState title="暂无审计事件" description="完成评测集导入、版本运行或人工复核后，这里会显示可追溯记录。" />}
+    </Panel>
+  </div>
+}
+
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   useEffect(() => { const fn = (e: KeyboardEvent) => e.key === 'Escape' && onClose(); document.addEventListener('keydown', fn); return () => document.removeEventListener('keydown', fn) }, [onClose])
   return <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}><section className="modal" role="dialog" aria-modal="true" aria-label={title}><header><h2>{title}</h2><button className="icon-btn" onClick={onClose} aria-label="关闭"><Icon name="close" /></button></header><div className="modal-body">{children}</div></section></div>
@@ -280,12 +321,12 @@ export default function App() {
     <aside className={cn('sidebar', mobileNav && 'mobile-open')}>
       <div className="brand"><div className="brand-mark">A<span>Q</span></div><div><strong>Agent QualityOps</strong><small>智能体质量运营平台</small></div></div>
       <nav>{nav.map((item) => <button key={item.id} className={page === item.id ? 'active' : ''} onClick={() => navigate(item.id)}><Icon name={item.id} /><span><strong>{item.label}</strong><small>{item.hint}</small></span></button>)}</nav>
-      <div className="sidebar-foot"><div className="service"><i className={health.error ? 'offline' : health.loading ? 'checking' : 'online'} /><div><strong>{health.error ? '服务未连接' : health.loading ? '正在检查' : '后端服务正常'}</strong><small>{health.error ? '数据不会被模拟' : 'FastAPI · SQLite'}</small></div><button onClick={() => void health.refresh()} aria-label="重新检测"><Icon name="refresh" size={14} /></button></div><p>Agent QualityOps <b>v0.1</b></p></div>
+      <div className="sidebar-foot"><div className="service"><i className={health.error ? 'offline' : health.loading ? 'checking' : 'online'} /><div><strong>{health.error ? '服务未连接' : health.loading ? '正在检查' : '后端服务正常'}</strong><small>{health.error ? '数据不会被模拟' : 'FastAPI · SQLite'}</small></div><button onClick={() => void health.refresh()} aria-label="重新检测"><Icon name="refresh" size={14} /></button></div><p>Agent QualityOps <b>v0.2</b></p></div>
     </aside>
     <div className="main-wrap">
       <header className="topbar"><button className="menu-btn" onClick={() => setMobileNav(!mobileNav)} aria-label="菜单"><span /><span /><span /></button><div className="breadcrumbs"><span>质量运营台</span><b>/</b><strong>{titleFor(page)}</strong></div><div className="topbar-right"><span className="env">离线评测环境</span><span className="avatar">ZC</span></div></header>
       {health.error && <div className="offline-banner"><Icon name="alert" /><span><strong>后端服务未连接。</strong> 页面不会展示模拟成功数据；启动 FastAPI 后点击重试。</span><button onClick={() => void health.refresh()}>重新连接</button></div>}
-      <main>{page === 'overview' && <OverviewPage navigate={navigate} />}{page === 'cases' && <CasesPage />}{page === 'runs' && <RunsPage />}{page === 'badcases' && <BadcasesPage />}{page === 'release' && <ReleasePage />}</main>
+      <main>{page === 'overview' && <OverviewPage navigate={navigate} />}{page === 'cases' && <CasesPage />}{page === 'runs' && <RunsPage />}{page === 'badcases' && <BadcasesPage />}{page === 'release' && <ReleasePage />}{page === 'audit' && <AuditPage />}</main>
     </div>
     {mobileNav && <div className="nav-overlay" onClick={() => setMobileNav(false)} />}
   </div>

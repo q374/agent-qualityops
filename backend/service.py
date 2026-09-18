@@ -16,7 +16,7 @@ from .adapters import (
     ModelTimeout,
     estimate_input_tokens,
 )
-from .database import Database, decode_case, normalize_row
+from .database import Database, decode_audit_event, decode_case, normalize_row
 from .evaluator import DeterministicJudge, Judge, Scores
 from .schemas import EvalCaseInput, HumanReviewInput, PromptVersionInput
 
@@ -75,6 +75,57 @@ class QualityOpsService:
         if mode == "deepseek":
             return DeepSeekAdapter()
         raise BadRequestError("不支持的运行模式")
+
+    def _record_audit(
+        self,
+        action: str,
+        entity_type: str,
+        entity_id: int | None,
+        summary: str,
+        metadata: dict[str, Any] | None = None,
+        *,
+        conn: Any | None = None,
+    ) -> int:
+        values = (
+            action,
+            entity_type,
+            entity_id,
+            summary,
+            json.dumps(metadata or {}, ensure_ascii=False, sort_keys=True),
+            datetime.now(timezone.utc).isoformat(),
+        )
+        sql = (
+            "INSERT INTO audit_events"
+            "(action, entity_type, entity_id, summary, metadata_json, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)"
+        )
+        if conn is not None:
+            return int(conn.execute(sql, values).lastrowid)
+        with self.db.transaction() as audit_conn:
+            return int(audit_conn.execute(sql, values).lastrowid)
+
+    def list_audit_events(
+        self,
+        *,
+        action: str | None = None,
+        entity_type: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if action:
+            clauses.append("action = ?")
+            params.append(action)
+        if entity_type:
+            clauses.append("entity_type = ?")
+            params.append(entity_type)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.append(limit)
+        rows = self.db.fetch_all(
+            f"SELECT * FROM audit_events{where} ORDER BY id DESC LIMIT ?",
+            tuple(params),
+        )
+        return [decode_audit_event(row) for row in rows]
 
     def seed_versions(self) -> int:
         seeds = [
@@ -145,6 +196,14 @@ class QualityOpsService:
             ids = [row[0] for row in conn.execute(
                 f"SELECT id FROM eval_cases WHERE external_id IN ({placeholders}) ORDER BY id", tuple(external_ids)
             ).fetchall()]
+            self._record_audit(
+                "cases.imported",
+                "eval_case_batch",
+                None,
+                f"导入 {len(ids)} 条评测用例",
+                {"count": len(ids)},
+                conn=conn,
+            )
         return {"imported": len(ids), "case_ids": ids}
 
     def import_cases_file(self, path: str | Path) -> dict[str, Any]:
@@ -169,6 +228,14 @@ class QualityOpsService:
                     (payload.name, payload.model, payload.system_prompt, payload.temperature, int(payload.is_baseline)),
                 )
                 version_id = cursor.lastrowid
+                self._record_audit(
+                    "version.created",
+                    "prompt_version",
+                    int(version_id),
+                    f"创建 Prompt 版本：{payload.name}",
+                    {"model": payload.model, "is_baseline": payload.is_baseline},
+                    conn=conn,
+                )
         except Exception as exc:
             if "UNIQUE constraint" in str(exc):
                 raise ConflictError("版本名称已存在") from exc
@@ -313,6 +380,26 @@ class QualityOpsService:
             conn.execute(
                 "UPDATE eval_runs SET status = ?, completed_at = ?, spent_cny = ?, error_message = ? WHERE id = ?",
                 (status, now, spent, error, run_id),
+            )
+            run = conn.execute(
+                "SELECT prompt_version_id, mode FROM eval_runs WHERE id = ?", (run_id,)
+            ).fetchone()
+            case_count = conn.execute(
+                "SELECT COUNT(*) FROM eval_results WHERE run_id = ?", (run_id,)
+            ).fetchone()[0]
+            self._record_audit(
+                "run.completed",
+                "eval_run",
+                run_id,
+                f"评测运行结束：{status}",
+                {
+                    "prompt_version_id": run[0],
+                    "mode": run[1],
+                    "status": status,
+                    "case_count": case_count,
+                    "spent_cny": spent,
+                },
+                conn=conn,
             )
 
     @staticmethod
@@ -476,6 +563,14 @@ class QualityOpsService:
             )
             conn.execute("UPDATE eval_results SET review_status = 'reviewed' WHERE id = ?", (result_id,))
             review_id = int(cursor.lastrowid)
+            self._record_audit(
+                "review.submitted",
+                "human_review",
+                review_id,
+                f"提交结果 #{result_id} 的人工复核",
+                {"result_id": result_id, "decision": payload.decision},
+                conn=conn,
+            )
         review = self.db.fetch_one("SELECT * FROM human_reviews WHERE id = ?", (review_id,))
         return review or {}
 
@@ -497,14 +592,27 @@ class QualityOpsService:
                                "passed": candidate["status"] == "completed"},
         }
         passed = all(check["passed"] for check in checks.values())
-        return {
+        decision = "allow_release" if passed else "block_release"
+        result = {
             "candidate_run_id": candidate_run_id,
             "baseline_run_id": baseline_run_id,
-            "decision": "allow_release" if passed else "block_release",
+            "decision": decision,
             "passed": passed,
             "checks": checks,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
+        self._record_audit(
+            "gate.evaluated",
+            "release_gate",
+            candidate_run_id,
+            "发布门禁允许发布" if passed else "发布门禁阻断发布",
+            {
+                "baseline_run_id": baseline_run_id,
+                "decision": decision,
+                "failed_checks": [name for name, check in checks.items() if not check["passed"]],
+            },
+        )
+        return result
 
     def report(self, run_id: int) -> dict[str, Any]:
         run = self.get_run(run_id)
@@ -522,7 +630,7 @@ class QualityOpsService:
         counts = {}
         for name, table in (("cases", "eval_cases"), ("versions", "prompt_versions"),
                             ("runs", "eval_runs"), ("results", "eval_results"),
-                            ("reviews", "human_reviews")):
+                            ("reviews", "human_reviews"), ("audit_events", "audit_events")):
             counts[name] = self.db.fetch_one(f"SELECT COUNT(*) AS n FROM {table}")["n"]
         latest = self.list_runs()[:2]
         return {"counts": counts, "latest_runs": latest, "max_budget_cny": MAX_BUDGET_CNY}
