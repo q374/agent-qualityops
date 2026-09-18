@@ -14,6 +14,7 @@ def case_payload() -> dict:
         "category": "operation",
         "input_text": "如何配置工具调用？",
         "reference_answer": "在工作流中添加工具节点，配置参数后先调试，再发布。",
+        "evidence_text": "公开资料说明：添加工具节点、配置参数、完成调试后再发布。",
         "expected_keywords": ["工具节点", "参数", "调试"],
         "source_title": "公开产品文档",
         "source_url": "https://example.com/docs/tools",

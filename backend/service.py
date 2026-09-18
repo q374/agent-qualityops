@@ -175,8 +175,9 @@ class QualityOpsService:
             conn.executemany(
                 """INSERT INTO eval_cases
                    (external_id, title, category, input_text, reference_answer,
-                    expected_keywords, source_title, source_url, risk_level, expected_behavior)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    evidence_text, expected_keywords, source_title, source_url, risk_level,
+                    expected_behavior)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 [
                     (
                         item.external_id,
@@ -184,6 +185,7 @@ class QualityOpsService:
                         item.category,
                         item.input_text,
                         item.reference_answer,
+                        item.evidence_text,
                         json.dumps(item.expected_keywords, ensure_ascii=False),
                         item.source_title,
                         item.source_url,

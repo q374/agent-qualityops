@@ -52,6 +52,7 @@ def test_deepseek_disables_thinking_by_default(monkeypatch) -> None:
             "input_text": "如何配置？",
             "source_title": "公开文档",
             "source_url": "https://example.com/docs",
+            "evidence_text": "先添加节点，再配置参数。",
         },
         {
             "model": "deepseek-flash",
@@ -61,6 +62,7 @@ def test_deepseek_disables_thinking_by_default(monkeypatch) -> None:
     )
 
     assert captured["payload"]["thinking"] == {"type": "disabled"}
+    assert "先添加节点" in captured["payload"]["messages"][1]["content"]
     assert captured["timeout"] == 12
     assert response.text == "最终回答"
 
@@ -86,6 +88,7 @@ def test_invalid_response_keeps_billable_usage(monkeypatch) -> None:
                 "input_text": "如何配置？",
                 "source_title": "公开文档",
                 "source_url": "https://example.com/docs",
+                "evidence_text": "先添加节点，再配置参数。",
             },
             {
                 "model": "deepseek-flash",

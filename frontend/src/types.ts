@@ -8,6 +8,7 @@ export interface EvalCase {
   category: string
   input_text: string
   reference_answer: string
+  evidence_text: string
   expected_keywords: string[]
   source_title: string
   source_url: string

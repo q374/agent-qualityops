@@ -21,13 +21,23 @@ class EvalCaseInput(BaseModel):
     category: Category
     input_text: str = Field(min_length=1, max_length=20_000)
     reference_answer: str = Field(min_length=1, max_length=30_000)
+    evidence_text: str = Field(min_length=1, max_length=30_000)
     expected_keywords: list[str] = Field(default_factory=list, max_length=30)
     source_title: str = Field(min_length=1, max_length=300)
     source_url: str = Field(min_length=1, max_length=2_000)
     risk_level: RiskLevel
     expected_behavior: str = Field(min_length=1, max_length=100)
 
-    @field_validator("external_id", "title", "input_text", "reference_answer", "source_title", "source_url", "expected_behavior")
+    @field_validator(
+        "external_id",
+        "title",
+        "input_text",
+        "reference_answer",
+        "evidence_text",
+        "source_title",
+        "source_url",
+        "expected_behavior",
+    )
     @classmethod
     def strip_required(cls, value: str) -> str:
         value = value.strip()

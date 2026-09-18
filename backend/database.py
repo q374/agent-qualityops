@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 class Database:
@@ -51,6 +51,7 @@ class Database:
                     category TEXT NOT NULL,
                     input_text TEXT NOT NULL,
                     reference_answer TEXT NOT NULL,
+                    evidence_text TEXT NOT NULL,
                     expected_keywords TEXT NOT NULL,
                     source_title TEXT NOT NULL,
                     source_url TEXT NOT NULL,
@@ -122,6 +123,20 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_reviews_result ON human_reviews(result_id, id DESC);
                 CREATE INDEX IF NOT EXISTS idx_audit_action_created ON audit_events(action, id DESC);
                 """
+            )
+            columns = {
+                row[1] for row in conn.execute("PRAGMA table_info(eval_cases)").fetchall()
+            }
+            if "evidence_text" not in columns:
+                conn.execute(
+                    "ALTER TABLE eval_cases ADD COLUMN evidence_text TEXT NOT NULL DEFAULT ''"
+                )
+            # 旧版数据库没有独立证据字段。迁移时保留原有参考答案作为
+            # 公开资料的合成事实卡，避免真实运行只拿到 URL 却无法读取正文。
+            conn.execute(
+                """UPDATE eval_cases
+                   SET evidence_text = reference_answer
+                   WHERE evidence_text = ''"""
             )
             conn.execute(
                 "INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)",
