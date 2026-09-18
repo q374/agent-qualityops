@@ -1,0 +1,27 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+backend/qualityops.db
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+work/
+*.log
+.DS_Store
+Thumbs.db
+verify_tmp/
+
+# 本地验证与用户交付产物
+deliverables/
+tests/backend/.tmp/
+video/round2/*.png
+video/round3/audio/
+video/round3/*.wav
+video/round3/*.mp4

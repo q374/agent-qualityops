@@ -1,0 +1,99 @@
+{
+  "artifact": "Agent QualityOps 可复现离线演示证据",
+  "generated_at": "2026-09-18T02:00:50.659279+00:00",
+  "disclaimer": "结果来自确定性 Demo Provider 与公开资料衍生合成用例，不代表真实模型或企业线上质量。",
+  "dataset": {
+    "total": 50,
+    "source_type": "公开文档与合成测试"
+  },
+  "versions": [
+    {
+      "id": 1,
+      "name": "Baseline v1",
+      "model": "deepseek-flash"
+    },
+    {
+      "id": 2,
+      "name": "Candidate v2",
+      "model": "deepseek-flash"
+    }
+  ],
+  "run": {
+    "mode": "demo",
+    "baseline_run_id": 1,
+    "candidate_run_id": 2,
+    "spent_cny": 0.0
+  },
+  "comparison": {
+    "matched_cases": 50,
+    "severe_regressions": 0,
+    "baseline_metrics": {
+      "total": 50,
+      "correctness_avg": 86.4,
+      "groundedness_pass_rate": 88.0,
+      "task_completion_pass_rate": 86.0,
+      "safety_failures": 0,
+      "high_risk_safety_failures": 0,
+      "needs_review": 27,
+      "avg_latency_ms": 1.0,
+      "total_tokens": 0,
+      "cost_cny": 0.0
+    },
+    "candidate_metrics": {
+      "total": 50,
+      "correctness_avg": 97.6,
+      "groundedness_pass_rate": 100.0,
+      "task_completion_pass_rate": 98.0,
+      "safety_failures": 0,
+      "high_risk_safety_failures": 0,
+      "needs_review": 21,
+      "avg_latency_ms": 1.0,
+      "total_tokens": 0,
+      "cost_cny": 0.0
+    }
+  },
+  "human_review": {
+    "reviewed_result_id": 61,
+    "badcases_before": 21,
+    "badcases_after": 20
+  },
+  "release_gate": {
+    "candidate_run_id": 2,
+    "baseline_run_id": 1,
+    "decision": "block_release",
+    "passed": false,
+    "checks": {
+      "high_risk_safety_failures": {
+        "actual": 0,
+        "limit": 0,
+        "passed": true
+      },
+      "groundedness_pass_rate": {
+        "actual": 100.0,
+        "minimum": 90,
+        "passed": true
+      },
+      "task_completion_pass_rate": {
+        "actual": 98.0,
+        "minimum": 80,
+        "passed": true
+      },
+      "severe_regressions": {
+        "actual": 0,
+        "maximum": 3,
+        "passed": true
+      },
+      "required_reviews": {
+        "actual": 20,
+        "maximum": 0,
+        "passed": false
+      },
+      "run_completed": {
+        "actual": "completed",
+        "expected": "completed",
+        "passed": true
+      }
+    },
+    "generated_at": "2026-09-18T02:00:50.657455+00:00"
+  }
+}
