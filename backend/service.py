@@ -347,7 +347,26 @@ class QualityOpsService:
                 errors += 1
                 category = "model_timeout" if isinstance(exc, ModelTimeout) else "invalid_model_response"
                 scores = Scores(0, 0, 0, False, category, "high", True)
-                self._insert_result(run_id, case["id"], "", 0, 0, 0, 0, scores)
+                latency = getattr(exc, "latency_ms", 0)
+                input_tokens = getattr(exc, "input_tokens", 0)
+                output_tokens = getattr(exc, "output_tokens", 0)
+                cost = (
+                    self.calculate_cost(input_tokens, output_tokens)
+                    if isinstance(adapter, DeepSeekAdapter)
+                    else 0.0
+                )
+                budget.charge(cost)
+                run_spent = round(run_spent + cost, 8)
+                self._insert_result(
+                    run_id,
+                    case["id"],
+                    "",
+                    latency,
+                    input_tokens,
+                    output_tokens,
+                    cost,
+                    scores,
+                )
 
         if budget_stopped:
             status, error = "budget_exceeded", "预算不足以安全预留下一次模型调用，已硬停止"

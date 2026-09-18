@@ -25,3 +25,7 @@ video/round2/*.png
 video/round3/audio/
 video/round3/*.wav
 video/round3/*.mp4
+
+backend/qualityops.db-wal
+backend/qualityops.db-shm
+.tmp/

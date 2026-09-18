@@ -120,6 +120,50 @@ def test_timeout_or_invalid_response_enters_badcase(tmp_path, case_payload: dict
     assert len(badcases) == 1
 
 
+def test_invalid_deepseek_response_still_counts_billable_tokens(tmp_path, case_payload: dict) -> None:
+    from backend.adapters import DeepSeekAdapter
+
+    class BillableBrokenAdapter(DeepSeekAdapter):
+        max_output_tokens = 800
+
+        def __init__(self):
+            pass
+
+        def generate(self, case: dict[str, Any], version: dict[str, Any]) -> ModelResponse:
+            raise InvalidModelResponse(
+                "模型返回格式无效",
+                input_tokens=100,
+                output_tokens=200,
+                latency_ms=25,
+            )
+
+    app = create_app(
+        tmp_path / "billable-error.db",
+        adapter_factory=lambda mode: BillableBrokenAdapter(),
+        auto_seed_cases=False,
+    )
+    with TestClient(app) as client:
+        case_id = import_one(client, case_payload)
+        version_id = client.get("/api/versions").json()[0]["id"]
+        response = client.post(
+            "/api/runs",
+            json={
+                "version_ids": [version_id],
+                "case_ids": [case_id],
+                "mode": "deepseek",
+                "budget_cny": 5,
+            },
+        ).json()
+        run = client.get(f"/api/runs/{response['runs'][0]['id']}").json()
+
+    expected_cost = app.state.service.calculate_cost(100, 200)
+    assert response["spent_cny"] == expected_cost
+    assert run["results"][0]["input_tokens"] == 100
+    assert run["results"][0]["output_tokens"] == 200
+    assert run["results"][0]["cost_cny"] == expected_cost
+    assert run["results"][0]["latency_ms"] == 25
+
+
 def test_release_gate_requires_review_and_human_override(client: TestClient, case_payload: dict) -> None:
     risky = dict(
         case_payload,

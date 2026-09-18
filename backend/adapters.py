@@ -19,7 +19,18 @@ class ModelTimeout(ModelError):
 
 
 class InvalidModelResponse(ModelError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        latency_ms: int = 0,
+    ):
+        super().__init__(message)
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+        self.latency_ms = latency_ms
 
 
 @dataclass(frozen=True)
@@ -65,6 +76,9 @@ class DeepSeekAdapter:
         self.api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
         self.base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
         self.timeout_seconds = timeout_seconds or float(os.getenv("DEEPSEEK_TIMEOUT_SECONDS", "30"))
+        self.thinking_mode = os.getenv("DEEPSEEK_THINKING_MODE", "disabled").strip().lower()
+        if self.thinking_mode not in {"enabled", "disabled"}:
+            raise ModelError("DEEPSEEK_THINKING_MODE 只能是 enabled 或 disabled")
         if not self.api_key:
             raise ModelError("DeepSeek 模式需要设置 DEEPSEEK_API_KEY")
 
@@ -82,6 +96,9 @@ class DeepSeekAdapter:
             ],
             "temperature": version["temperature"],
             "max_tokens": self.max_output_tokens,
+            # Flash 当前默认开启思考模式。质量评测需要稳定取得最终回答，
+            # 因此默认关闭，避免推理内容耗尽 max_tokens 后 content 为空。
+            "thinking": {"type": self.thinking_mode},
         }
         request = urllib.request.Request(
             f"{self.base_url}/chat/completions",
@@ -104,14 +121,22 @@ class DeepSeekAdapter:
         latency = max(1, int((time.perf_counter() - started) * 1000))
         try:
             data = json.loads(raw)
-            text = data["choices"][0]["message"]["content"].strip()
             usage = data.get("usage", {})
             input_tokens = int(usage.get("prompt_tokens", 0))
             output_tokens = int(usage.get("completion_tokens", 0))
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise InvalidModelResponse("模型返回格式无效", latency_ms=latency) from exc
+        try:
+            text = data["choices"][0]["message"]["content"].strip()
             if not text:
                 raise ValueError("empty output")
-        except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
-            raise InvalidModelResponse("模型返回格式无效") from exc
+        except (KeyError, IndexError, AttributeError, TypeError, ValueError) as exc:
+            raise InvalidModelResponse(
+                "模型返回格式无效",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                latency_ms=latency,
+            ) from exc
         return ModelResponse(text, input_tokens, output_tokens, latency)
 
 
