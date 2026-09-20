@@ -26,7 +26,7 @@
 - 用户已在界面提交 20 条高风险用例的人工判定，R013 待审核数为 0；最终六项发布门禁全部通过，结论为 `allow_release`。
 - 真实评测报告见 `docs/REAL_EVALUATION_REPORT.md`，人工复核清单见 `docs/HUMAN_REVIEW_CHECKLIST.md`，简历表述见 `docs/RESUME_COPY.md`。
 - 本轮最终验证：后端 23 项测试通过；前端 TypeScript 检查与生产构建通过；浏览器已核对 R012/R013 对比页及成本小数显示。
-- 比赛报名、GitHub 发帖/PR、对外发布均未执行，需用户单独确认。
+- GitHub 公开仓库已发布：https://github.com/q374/agent-qualityops；比赛报名与其他对外提交仍未执行。
 
 ## 下一步
 
