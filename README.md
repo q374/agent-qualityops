@@ -1,95 +1,88 @@
 # Agent QualityOps
 
-面向 AI 产品经理与智能体团队的轻量级评测、Badcase 复核和发布门禁 MVP。
+> AI Agent 版本评测与发布门禁工具：用可复现评测、Badcase 复核和发布规则，帮助团队判断新 Prompt 或模型版本是否值得发布。
 
-它不再做“又一个聊天机器人”，而是回答三个上线前问题：
+## 项目定位
 
-1. 新 Prompt / 模型版本是否真的更好？
-2. 失败发生在哪些场景，哪些必须人工复核？
-3. 当前证据是否足以允许发布？
+AI 团队更新 Prompt 或模型后，单看平均分容易掩盖安全失败、严重回归和成本增长。Agent QualityOps 将“感觉变好了”转化为一套可追踪的发布判断流程。
 
-> 当前版本是基于公开文档与合成测试问题的离线 MVP，未接入企业生产数据，也未在企业环境部署。
+**完整流程：** 导入评测集 → 运行基线与候选版本 → 对比质量、安全、延迟、Token 与成本 → 定位 Badcase → 人工复核 → 发布门禁
 
-## 已实现范围
+## 核心能力
 
-- 导入带事实来源的评测集；内置 50 条 Dify / DeerFlow 公开文档用例。
-- 配置两个 Prompt 版本并批量运行。
-- 记录正确性、依据充分度、任务完成率、安全、延迟、Token 与成本。
-- 对比基线与候选版本，形成 Badcase 队列。
-- 人工复核可覆盖自动评分，但保留原始判断。
-- 记录数据导入、版本创建、运行、复核和门禁判断的审计时间线。
-- 按安全、依据、任务完成率和严重回归数生成发布门禁。
-- 支持无费用的确定性 `demo` 模式和可选 DeepSeek 真实调用模式。
-- 真实模型运行使用公开资料整理的合成事实卡模拟检索上下文，不把 URL 当作模型已读取的证据。
+- **版本化评测**：统一管理评测集、Prompt 版本和运行记录，支持基线与候选版本对照。
+- **多维指标**：同时观察正确性、依据充分度、任务完成率、安全、延迟、Token 与成本，避免只追求单一分数。
+- **Badcase 定位**：按严重程度和失败原因筛选问题样本，回溯输入、输出、自动评分与人工结论。
+- **分层复核**：普通样本自动评估，高风险样本进入人工复核；人工结论可覆盖自动评分，但保留原始记录。
+- **发布门禁**：将安全失败、严重回归、任务完成率和待复核数量转化为可解释的阻断原因。
+- **审计记录**：记录数据导入、版本创建、运行、复核和门禁判断，便于复盘版本决策。
 
-## 产品边界
+## 验证结果
 
-- `demo` 模式用于验证产品流程，结果不能写成真实模型质量。
-- 真实模型模式必须在本地配置密钥，并受单批次预算和全局预算双重限制。
-- 当前审计时间线属于 MVP 操作留痕；未实现不可篡改存储、登录、租户隔离、异步任务队列或企业密钥管理。
-- 自动评分不能覆盖确定性安全失败；高风险失败必须人工复核。
+项目使用 **50 条基于 Dify / DeerFlow 公开资料整理的合成用例**，通过 DeepSeek API 对基线版本 R012 与候选版本 R013 进行对照评测：
+
+| 指标 | R012 基线 | R013 候选 | 变化 |
+|---|---:|---:|---:|
+| 平均正确性 | 97.2 | 99.6 | +2.4 |
+| 依据通过率 | 96% | 100% | +4pp |
+| 任务完成率 | 96% | 100% | +4pp |
+| 高风险安全失败 | 0 | 0 | 持平 |
+| 严重回归 | — | 0 | 无阻断 |
+| 平均延迟 | 971.1ms | 1,252.6ms | +29% |
+| Token 总量 | 11,746 | 24,381 | +108% |
+| 平台估算成本 | ¥0.0507 | ¥0.0998 | +97% |
+
+候选版本在质量指标上提升，但延迟、Token 和成本同步增长。系统据此暴露“质量收益是否值得资源开销”的产品取舍，而不是只给出一个平均分。20 条高风险样本完成人工复核后，项目内门禁给出 `allow_release` 结论，并保留逐条复核记录。
+
+> 以上结果来自公开资料合成用例与指定模型版本，仅用于验证产品流程，不代表企业生产效果或通用模型能力。
+
+## 产品界面
+
+前端提供总览、数据集、版本、运行、Badcase、人工复核与发布门禁等页面；后端提供评测编排、指标聚合、审计记录和门禁计算接口。
 
 ## 快速开始
 
 ### 1. 启动后端
 
 ```powershell
-cd D:\agent-qualityops
 python -m pip install -r backend/requirements-dev.txt
 python -m uvicorn backend.main:app --reload --port 8000
 ```
 
-后端首次启动会初始化 SQLite 数据库、导入 50 条评测用例并创建基线/候选 Prompt 版本。
-
 ### 2. 启动前端
 
 ```powershell
-cd D:\agent-qualityops\frontend
+cd frontend
 npm install
 npm run dev
 ```
 
-访问 `http://localhost:5173`。开发服务器会将 `/api` 代理到 `http://localhost:8000`。
+打开 `http://localhost:5173`。默认可使用确定性演示模式；接入真实模型时，请将密钥写入本地环境变量，不要提交到仓库。
 
-### 3. 真实模型模式（可选）
-
-项目根目录已经准备了被 Git 忽略的 `.env`。只在该本地文件中填写 `DEEPSEEK_API_KEY`，然后重启后端；项目会自动加载，不覆盖系统已有环境变量。不要把密钥粘贴到聊天、日志或 Git。
-
-默认模型为 `deepseek-flash`，单批预算硬上限为 5 元。项目默认设置 `DEEPSEEK_THINKING_MODE=disabled`，让有限输出预算优先生成可评分的最终回答；如需研究思考模式可在本地改为 `enabled` 并同步提高输出预算。界面左下角会显示“DeepSeek 已配置”或“Demo 模式 · 未配置 API”。当前费用只是根据官方峰值美元价格和示例汇率进行的保守预算估算，真实账单以 DeepSeek 官方计费为准。
-
-## 验证
+### 3. 一键验证
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/verify.ps1
 ```
 
-脚本会依次运行后端测试、前端类型检查、前端构建，并生成可复现的离线演示证据。详细验收范围见 [评测方案](docs/EVALUATION_PLAN.md)、[演示证据](docs/DEMO_EVIDENCE.json) 和 [演示脚本](docs/DEMO_SCRIPT.md)。
+## 关键文档
 
-## 文档
+- [产品需求文档](./docs/PRD.md)
+- [评测方案](./docs/EVALUATION_PLAN.md)
+- [真实 API 评测报告](./docs/REAL_EVALUATION_REPORT.md)
+- [最终评测数据](./docs/FINAL_EVALUATION_REPORT.json)
+- [发布门禁证据](./docs/FINAL_RELEASE_GATE.json)
+- [人工复核清单](./docs/HUMAN_REVIEW_CHECKLIST.md)
+- [系统架构](./docs/ARCHITECTURE.md)
 
-- [产品需求文档](docs/PRD.md)
-- [架构说明](docs/ARCHITECTURE.md)
-- [API 契约](docs/API_CONTRACT.md)
-- [评测方案](docs/EVALUATION_PLAN.md)
-- [DeepSeek 真实评测报告](docs/REAL_EVALUATION_REPORT.md)
-- [最终发布门禁证据](docs/FINAL_RELEASE_GATE.json)
-- [最终完整评测证据](docs/FINAL_EVALUATION_REPORT.json)
-- [人工复核清单](docs/HUMAN_REVIEW_CHECKLIST.md)
-- [比赛材料](docs/COMPETITION_PACKAGE.md)
-- [演示视频设计稿](docs/DEMO_VIDEO_DESIGN.md)
-- [静态作品集页面](portfolio/index.html)
-- [简历项目描述](docs/RESUME_COPY.md)
-- [开源贡献草稿](docs/OPEN_SOURCE_CONTRIBUTION_DRAFT.md)
-- [发布候选检查清单](docs/RELEASE_CHECKLIST.md)
-- [参与贡献](CONTRIBUTING.md)
-- [版本记录](CHANGELOG.md)
+## 当前边界
 
-## 证据原则
-
-- 报告必须保留用例来源、模型/Prompt 版本、时间、成本和人工判断。
-- 公开项目、比赛报名、企业部署、真实用户和指标提升均不得在没有证据时声明。
-- 比赛账号注册、正式提交与对外发布不包含在本仓库自动化中。
+- 当前为本地 MVP，未接入企业生产数据，也未在企业环境部署。
+- 内置用例来源于公开资料并经过合成，不等同于真实用户样本。
+- `allow_release` 是本项目的离线规则结论，不等同于生产发布审批。
+- 暂未实现登录、租户隔离、异步任务队列和企业密钥管理。
 
 ## License
 
-[MIT](LICENSE)
+[MIT](./LICENSE)
+
