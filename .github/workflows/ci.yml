@@ -33,7 +33,7 @@ jobs:
         run: python -m pytest -q tests/backend --basetemp verify_tmp/pytest
 
       - name: 生成离线演示证据
-        run: python scripts/generate_demo_evidence.py
+        run: $env:PYTHONIOENCODING='utf-8'; python scripts/generate_demo_evidence.py
 
       - name: 配置 Node.js
         uses: actions/setup-node@v4
